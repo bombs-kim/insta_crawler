@@ -1,0 +1,17 @@
+Original and Ajax comparison
+
+<COMMON>
+CONCURRENT REQUESTS = 32
+Number of seed posts = 1000
+total number of requests = 3561
+
+<ORIGINAL>
+real    4m7.975s
+user    0m55.108s
+sys 0m2.112s
+
+<AJAX>
+real    3m12.758s
+user    0m45.464s
+sys 0m1.848s
+

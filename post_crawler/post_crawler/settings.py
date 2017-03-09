@@ -17,7 +17,7 @@ NEWSPIDER_MODULE = 'post_crawler.spiders'
 FLUME_SERVER_IP = '10.1.61.101'
 FLUME_SERVER_PORT = 44448
 
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'DEBUG'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'user_media_crawler (+http://www.yourdomain.com)'
@@ -26,15 +26,15 @@ LOG_LEVEL = 'INFO'
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 128
+CONCURRENT_REQUESTS = 64
 
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
 #DOWNLOAD_DELAY = 3
 # The download delay setting will honor only one of:
-CONCURRENT_REQUESTS_PER_DOMAIN = CONCURRENT_REQUESTS
-CONCURRENT_REQUESTS_PER_IP = CONCURRENT_REQUESTS
+# CONCURRENT_REQUESTS_PER_DOMAIN = CONCURRENT_REQUESTS
+# CONCURRENT_REQUESTS_PER_IP = CONCURRENT_REQUESTS
 
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED = False

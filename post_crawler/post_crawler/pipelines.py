@@ -6,22 +6,23 @@
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 
 import socket
+from post_crawler.items import PostItem, UserItem
 from spiders import json_patch
 
 
 class LocalSavePipeline(object):
     def process_item(self, item, spider):
-        if item.__class__.__name__ == 'MediaItem':
-            item_dict = dict(item)
-            filename = item_dict['name']
-            del item_dict['name']
-            line = json_patch.dump_json(item_dict)
-            with open(spider.output_path + '/' + spider.today + '/' + filename, 'a') as f:
+        if item.__class__ == PostItem:
+            item = dict(item)
+            filename = item['name']
+            del item['name']
+            line = json_patch.dump_json(item)
+            with open(spider.output_path + '/' + spider.date + '/' + filename, 'a') as f:
                 f.write(line.replace('\\/', '/') + '\n')
-        elif item.__class__.__name__ == 'UserItem':
-            item_dict = dict(item)
-            line = json_patch.dump_json(item_dict)
-            with open('user_profile.dat', 'a') as f:
+        elif item.__class__ == UserItem:
+            item = dict(item)
+            line = json_patch.dump_json(item)
+            with open(spider.output_path + '/''user_profile.jl', 'a') as f:
                 f.write(line + '\n')
 
 

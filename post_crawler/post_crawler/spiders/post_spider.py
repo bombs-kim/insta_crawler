@@ -16,10 +16,7 @@ COMMENTED_POSTS_FILE = 'commented_posts.txt'
 class PostSpider(scrapy.Spider):
     name = "post_spider"
     custom_settings = {
-        'ITEM_PIPELINES': {
-            'post_crawler.pipelines.LocalSavePipeline': 800,
-        }
-    }
+        'ITEM_PIPELINES': {'post_crawler.pipelines.LocalSavePipeline': 800}}
 
     def __init__(self, new_kor_file="newusers.txt",
                  valid_user_file="out/user_log.txt",
@@ -27,7 +24,6 @@ class PostSpider(scrapy.Spider):
         self.output_path = output_path  # need to change name 'output' => '?'
         self.load_user_cnt, self.valid_user_cnt = 0, 0
         self.date = datetime.now().strftime('%Y%m%d_%H%M%S')
-
         if not os.path.isfile(self.output_path + '/' + USER_LOG):
             with open(self.output_path + '/' + USER_LOG, 'w'):
                 pass
@@ -38,7 +34,7 @@ class PostSpider(scrapy.Spider):
         self.valid_user_cnt = self.load_user_cnt
         self.logger.info('task count ::: %s' % len(self.task_list))
 
-        if flume == 'FLUME':
+        if flume:
             PostSpider.custom_settings['ITEM_PIPELINES'][
                 'post_spider.pipelines.FlumePipeline'] = 300
         else:
@@ -59,13 +55,15 @@ class PostSpider(scrapy.Spider):
 
     def make_request(self, task, cursor=None):
         url = 'https://www.instagram.com/%s/' % task['username']
-        if cursor:
-            url += '?max_id=' + cursor
-        else:
-            # what the heck is this?
-            self.logger.critical('None cursor url: %s, cursor: %s, task_max_id: %s'
-                                 % (url, cursor, task['max_id']))
-            url += '?max_id=' + str(task['max_id'])
+        assert(cursor)
+        # if cursor:
+        #     url += '?max_id=' + cursor
+        # else:
+        #     # what the heck is this?
+        #     self.logger.critical('None cursor url: %s, cursor: %s, task_max_id: %s'
+        #                          % (url, cursor, task['max_id']))
+        #     url += '?max_id=' + str(task['max_id'])
+        url += '?max_id=' + cursor
         meta = {'task': task, 'cursor': cursor}
         return scrapy.Request(url, meta=meta)
 
@@ -74,46 +72,56 @@ class PostSpider(scrapy.Spider):
         if response.status == 404:
             if 'code' in task:
                 url = 'https://www.instagram.com/p/%s/' % task['code']
-                return [scrapy.Request(url, meta=response.meta, callback=self.verify_user)]
+                yield scrapy.Request(url, meta=response.meta, callback=self.verify_user)
             else:
-                self.logger.info('first crawl in 404 ::: %s' % task['username'])
+                self.logger.info('404 in first crawl ::: %s' % task['username'])
                 self.valid_user_cnt -= 1
                 return
 
         contents = self.get_actual_contents(response.body)
         media_root = contents['entry_data']['ProfilePage'][0]['user']['media']
-        user_item = [self.get_user_info(contents['entry_data']['ProfilePage'][0]['user'])]
-        media_list, next_cursor, is_last_id_met = self.get_media_list(task, media_root)
-        if not media_list:
-            self.logger.error('FIRST RESPONSE IS NOT VALID ::: empty media_list')
-            self.logger.info('VALID_USER APPEND ::: %s' % json_patch.dump_json(task))
-            self.update_log(task)
-            return user_item
+        yield self.get_user_info(contents['entry_data']['ProfilePage'][0]['user'])
 
-        task['max_id'] = max([media['media_id'] for media in media_list])
-        task['recent_id'] = task['max_id']
-        task['code'] = media_list[-1]['url'].split('/')[-2]
+        if media_root['page_info']['has_next_page']:
+            next_cursor = media_root['page_info']['end_cursor']
+        else:
+            next_cursor = None
 
+        # get_media_list method has an side effect which sets task['recent_id'] to an new value
+        media_list = list(self.get_media_list(task, media_root, first=True))
+        is_last_id_met = True if 'Last_crawled_met' in media_list else False
+
+        media_list = [m for m in media_list if type(m) != str]
         self.save_commented_posts(media_list)
+        for item in media_list:
+            self.logger.debug(repr(item))  # not sure why spider doesn't print item by default
+            yield item
 
+        self.update_log(task)
         if is_last_id_met:
-            self.logger.info('LAST CRAWLED ID MEET :::')
-            self.update_log(task)
-            return media_list + user_item + []
-
+            self.logger.info('Last crawled id met :::')
+            return
         if not next_cursor:
-            self.logger.info('NONE CURSOR in FIRST REQUEST :::')
-            self.update_log(task)
-            return media_list + user_item + []
-        req = self.make_request(task=task, cursor=next_cursor)
-        return media_list + user_item + [req]
+            self.logger.info('No next_cursor :::')
+            return
+        yield self.make_request(task=task, cursor=next_cursor)
 
     def parse(self, response):
         task = response.meta['task']
         contents = self.get_actual_contents(response.body)
         media_root = contents['entry_data']['ProfilePage'][0]['user']['media']
-        media_list, next_cursor, is_last_id_met = self.get_media_list(
-            task, media_root)
+        if media_root['page_info']['has_next_page']:
+            next_cursor = media_root['page_info']['end_cursor']
+        else:
+            next_cursor = None
+        media_list = list(self.get_media_list(task, media_root))
+        is_last_id_met = True if 'Last_crawled_met' in media_list else False
+        media_list = [m for m in media_list if type(m) != str]
+        self.save_commented_posts(media_list)
+        for item in media_list:
+            self.logger.debug(repr(item))
+            yield item
+
         if is_last_id_met:
             finish_cond = 'LAST_ID_MET'
         elif next_cursor is None:
@@ -125,11 +133,8 @@ class PostSpider(scrapy.Spider):
             self.logger.info('FINISH_TASK (%s) ::: task %s'
                              % (finish_cond, task['username']))
             self.update_log(task)
-            return media_list
-
-        req = self.make_request(task=task, cursor=next_cursor)
-        self.save_commented_posts(media_list)
-        return media_list + [req]
+            return
+        yield self.make_request(task=task, cursor=next_cursor)
 
     def verify_user(self, response):
         task = response.meta['task']
@@ -213,32 +218,34 @@ class PostSpider(scrapy.Spider):
             return
         return json_patch.load_json(body[begin:end + 1])
 
-    def get_media_list(self, task, media_root):
-        media_ids, valid_media_list, is_last_id_met = set(), [], False
+    def get_media_list(self, task, media_root, first=False):
+        # media_ids, valid_media_list, is_last_id_met = set(), [], False
         if 'nodes' not in media_root:
             self.logger.info('nodes not in user ::: %s' % task['username'])
-            return valid_media_list, None, is_last_id_met
+            yield 'Nodes not in user'
+        first_post = True
         for media in media_root['nodes']:
             media_id = long(media['id'])
             media['id'] = media_id
-            media_ids.add(media_id)
-            if task['last_crawled_id'] >= media_id and False:
+            if task['last_crawled_id'] >= media_id and False:  # need to be changed
                 is_last_id_met = True
-                self.logger.info('last_crawled_id=%s, media_id=%s' % (task['last_crawled_id'], media_id))
-                break
-
+                self.logger.info('last_crawled_id=%s, media_id=%s' % (
+                    task['last_crawled_id'], media_id))
+                yield 'Last_crawled_met'
+                return
             date = datetime.fromtimestamp(media['date']).strftime('%Y-%m-%dT%H%M%S')
             media['date'] = date
             if 'caption' not in media:
                 media['caption'] = ''
             media['username'] = task['username']
             media['name'] = (task['username'] + '.jl').encode('utf-8')  # filename <= need to be fixed
-            valid_media_list.append(PostItem.create(media))
-        if media_root['page_info']['has_next_page']:
-            next_cursor = media_root['page_info']['end_cursor']
-        else:
-            next_cursor = None
-        return valid_media_list, next_cursor, is_last_id_met
+            item = PostItem.create(media)
+            yield item
+            if first and first_post:
+                first_post = False
+                task['recent_id'] = media_id
+                task['code'] = item['url'].split('/')[-2]
+
 
     def get_user_info(self, contents):
         item = UserItem()

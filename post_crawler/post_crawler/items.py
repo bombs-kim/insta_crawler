@@ -8,7 +8,7 @@
 import scrapy
 
 
-class MediaItem(scrapy.Item):
+class PostItem(scrapy.Item):
     media_id = scrapy.Field()
     url = scrapy.Field()
     date = scrapy.Field()
@@ -24,17 +24,17 @@ class MediaItem(scrapy.Item):
         return ""
 
     @staticmethod
-    def create(media):
-        return MediaItem(media_id=media['id'],
-                         url='https://www.instagram.com/p/%s/' % media['code'],
-                         date=media['date'],
-                         comment_count=media['comments']['count'],
-                         like_count=media['likes']['count'],
-                         user_id=media['owner']['id'],
-                         caption=media['caption'].replace('\n', ' ').replace('\t', ' '),
-                         is_video=media['is_video'],
-                         name=media['name'],
-                         username=media['username'],
+    def create(post):
+        return PostItem(media_id=post['id'],
+                         url='https://www.instagram.com/p/%s/' % post['code'],
+                         date=post['date'],
+                         comment_count=post['comments']['count'],
+                         like_count=post['likes']['count'],
+                         user_id=post['owner']['id'],
+                         caption=post['caption'].replace('\n', ' ').replace('\t', ' '),
+                         is_video=post['is_video'],
+                         name=post['name'],
+                         username=post['username'],
                          )
 
 

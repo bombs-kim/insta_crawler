@@ -4,43 +4,44 @@
 import os
 import time
 import scrapy
-from post_crawler.items import MediaItem, UserItem
+from post_crawler.items import PostItem, UserItem
 from post_crawler import pipelines
 import json_patch
 from datetime import datetime
 
 USER_LOG = 'user_log.dat'
-VALID_USER = 'crawl_valid_users.dat'
-COMMENT_MEDIA = 'comments_media.dat'
+# VALID_USER = 'crawl_valid_users.dat'
+COMMENTED_POSTS_FILE = 'commented_posts.txt'
 CRAWL_REPORT = 'crawl_report.dat'
 MAX_RETRY_NUM = 5
 
 RETRY_STATUS = [408, 429, 500, 502, 503]
 
 
-class PostCrawler(scrapy.Spider):
-    name = "post_crawler"
+class PostSpider(scrapy.Spider):
+    name = "post_spider"
     
     custom_settings = {
         'ITEM_PIPELINES': {
-            #'user_media_crawler.pipelines.LocalSavePipeline' : 800,
+            'post_crawler.pipelines.LocalSavePipeline' : 800,
             #'user_media_crawler.pipelines.FlumePipeline': 300,
         }
     }
 
-    def __init__(self, new_kor_file="", valid_user_file="", output_path="./users_log", deadline=0, flume=False):
+    def __init__(self, new_kor_file="newusers.txt", valid_user_file="out/user_log.dat",
+                 output_path="out", deadline=0, flume=False):
 
         self.output_path = output_path
-        self.need_to_sleep = True
+        self.need_to_sleep = True ##
 
         [self.load_user_cnt, self.valid_user_cnt, self.delete_user_cnt, self.change_username_cnt, self.new_kor_cnt,
          self.media_cnt] = 0, 0, 0, 0, 0, 0
 
-        self.today = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         if not os.path.isfile(self.output_path + '/' + USER_LOG):
             with open(self.output_path + '/' + USER_LOG, 'w') as f:
-                f.write("")
+                pass
 
         self.task_list = self.load_task(new_kor_file, valid_user_file, deadline)
         self.new_kor_valid_cnt = self.new_kor_cnt
@@ -50,15 +51,15 @@ class PostCrawler(scrapy.Spider):
 
         if flume == 'FLUME':
             self.logger.info('FLUME pipelines settings')
-            UserMediaCrawler.custom_settings['ITEM_PIPELINES'][
-                'user_media_crawler.pipelines.FlumePipeline'] = 300
+            PostSpider.custom_settings['ITEM_PIPELINES'][
+                'post_spider.pipelines.FlumePipeline'] = 300
         else:
             self.logger.info('Local Save pipelines settings')
-            UserMediaCrawler.custom_settings['ITEM_PIPELINES'][
-                'user_media_crawler.pipelines.LocalSavePipeline'] = 800
-            self.logger.info('Pipeline ::: %s' % UserMediaCrawler.custom_settings['ITEM_PIPELINES'])
-            if not os.path.isdir(self.output_path + '/' + self.today):
-                os.mkdir(self.output_path + '/' + self.today)
+            PostSpider.custom_settings['ITEM_PIPELINES'][
+                'post_crawler.pipelines.LocalSavePipeline'] = 800
+            self.logger.info('Pipeline ::: %s' % PostSpider.custom_settings['ITEM_PIPELINES'])
+            if not os.path.isdir(self.output_path + '/' + self.date):
+                os.mkdir(self.output_path + '/' + self.date)
 
     def start_requests(self):
         for task in self.task_list:
@@ -82,7 +83,7 @@ class PostCrawler(scrapy.Spider):
         self.logger.info('Media count     ::: %10s' % self.media_cnt)
         self.logger.info('####################################')
         with open(self.output_path + '/' + CRAWL_REPORT, 'a') as fw:
-            fw.write('##### %s #####\n' % self.today)
+            fw.write('##### %s #####\n' % self.date)
             fw.write('load_task       ::: %10s\n' % self.load_user_cnt)
             fw.write('Valid User      ::: %10s\n' % self.valid_user_cnt)
             fw.write('Delete User     ::: %10s\n' % self.delete_user_cnt)
@@ -106,19 +107,19 @@ class PostCrawler(scrapy.Spider):
             except:
                 return self.process_response_error(task, cursor, retry, response.url, 'unknown exception')
 
-    def make_first_request(self):
-        req_list = []
-        for task in self.task_list:
-            url = 'https://www.instagram.com/%s/' % task['username']
-            meta = {
-                'task': task,
-                'retry': 0,
-                'cursor': None,
-                'handle_httpstatus_all': True,
-            }
-            req_list.append(scrapy.Request(url, meta=meta, callback=self.parse_first_response))
+    # def make_first_request(self):
+    #     req_list = []
+    #     for task in self.task_list:
+    #         url = 'https://www.instagram.com/%s/' % task['username']
+    #         meta = {
+    #             'task': task,
+    #             'retry': 0,
+    #             'cursor': None,
+    #             'handle_httpstatus_all': True,
+    #         }
+    #         req_list.append(scrapy.Request(url, meta=meta, callback=self.parse_first_response))
 
-        return req_list
+    #     return req_list
 
     def make_request(self, task, cursor=None, retry=0):
 
@@ -149,7 +150,7 @@ class PostCrawler(scrapy.Spider):
         if response.status == 404:
             if 'code' in task:
                 url = 'https://www.instagram.com/p/%s/' % task['code']
-                return [scrapy.Request(url, meta=response.meta, callback=self.verifying_user)]
+                return [scrapy.Request(url, meta=response.meta, callback=self.verify_user)]
             else:
                 self.logger.info('first crawl in 404 ::: %s' % task['username'])
                 self.new_kor_valid_cnt -= 1
@@ -226,7 +227,7 @@ class PostCrawler(scrapy.Spider):
         self.media_cnt += len(media_list)
         return media_list + request_list
 
-    def verifying_user(self, response):
+    def verify_user(self, response):
         task = response.meta['task']
         if response.status == 404:
             self.logger.info('Delete user ::: %s, post_url ::: %s' % (task['username'], response.url))
@@ -237,14 +238,14 @@ class PostCrawler(scrapy.Spider):
             username = contents['entry_data']['PostPage'][0]['media']['owner']['username']
             self.logger.info('Change username ::: %s --> %s, post_url ::: %s' % (task['username'], username, response.url))
             self.change_username_cnt += 1
-            task['username'] = username 
+            task['username'] = username
             response.meta['task'] = task
             url = 'https://www.instagram.com/%s/' % task['username']
             yield scrapy.Request(url, meta=response.meta, callback=self.parse_first_response)
         elif response.status >= 500 or response.status == 429:
             self.logger.info('response status ::: %s, sleep 2 sec' % response.status)
             time.sleep(2)
-            yield scrapy.Request(response.url, meta=response.meta, callback=self.verifying_user)
+            yield scrapy.Request(response.url, meta=response.meta, callback=self.verify_user)
         else:
             self.logger.info('unknown error status ::: %s , url ::: %s' % (response.status, response.url))
 
@@ -252,13 +253,13 @@ class PostCrawler(scrapy.Spider):
         user_log = dict()
         user_log['code'] = task['code']
         user_log['last_crawled_id'] = str(task['recentId'])
-        user_log['update_time'] = self.today
+        user_log['update_time'] = self.date
         user_log['username'] = task['username']
         data = json_patch.dump_json(user_log)
         with open(self.output_path + '/' + USER_LOG, 'a') as f:
             f.write(data + '\n')
-        with open(self.output_path + '/' + VALID_USER + '.' + self.today, 'a') as fw:
-            fw.write(data + '\n')
+        # with open(self.output_path + '/' + VALID_USER + '.' + self.date, 'a') as fw:
+        #     fw.write(data + '\n')
 
     def process_response_error(self, task, cursor, retry, url, error_code):
 
@@ -317,31 +318,24 @@ class PostCrawler(scrapy.Spider):
         return task_list
 
     def comment_post_output(self, media_list):
-        with open(self.output_path+'/'+COMMENT_MEDIA+'.'+self.today, 'a') as f:
+        with open(self.output_path + '/'+ COMMENTED_POSTS_FILE + '.' + self.date, 'a') as f:
             for media in media_list:
                 if int(media['comment_count']) > 0:
                     f.write(str(media['comment_count']) + '\t' + media['url']+'\n')
 
     def get_actual_contents(self, body):
-        """
-        html body에서 실제 데이터 영역을 추출하여 json 객체로 변환
-        가정 : body에서 실제 데이터 영역은 한 라인이며, " ... window._sharedData = { ... } " 형식으로 되어 있다고 가정
-        """
-
-        beg = body.find('window._sharedData')
-        if beg == -1:
-            return None
-
-        beg = body.find('{', beg)
-        if beg == -1:
-            return None
-
-        end = body.find('\n', beg)
-        end = body.rfind('}', beg, end)
+        begin = body.find('window._sharedData')
+        if begin == -1:
+            return
+        begin = body.find('{', begin)
+        if begin == -1:
+            return
+        end = body.find('\n', begin)
+        end = body.rfind('}', begin, end)
         if end == -1:
-            return None
+            return
 
-        return json_patch.load_json(body[beg:end + 1])
+        return json_patch.load_json(body[begin:end + 1])
 
     def get_media_list(self, task, media_root):
 
@@ -376,16 +370,16 @@ class PostCrawler(scrapy.Spider):
             media['username'] = task['username']
             media['name'] = (task['username'] + '.dat').encode('utf-8')
 
-            valid_media_list.append(MediaItem.Create(media))
+            valid_media_list.append(PostItem.create(media))
         if media_root['page_info']['has_next_page']:
             next_cursor = media_root['page_info']['end_cursor']
         else:
             next_cursor = None
 
         return valid_media_list, next_cursor, is_last_id_meet, under_count
-    
+
     def get_user_info(self, contents):
-        item = UserItem() 
+        item = UserItem()
         item['username'] = contents['username']
         item['user_id'] = contents['id']
         item['biography'] = contents['biography']

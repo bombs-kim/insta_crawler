@@ -94,7 +94,7 @@ class PostSpider(scrapy.Spider):
         media_list = [m for m in media_list if type(m) != str]
         self.save_commented_posts(media_list)
         for item in media_list:
-            self.logger.debug(repr(item))  # not sure why spider doesn't print item by default
+            # self.logger.debug(repr(item))  # not sure why spider doesn't print item by default
             yield item
 
         self.update_log(task)
@@ -119,7 +119,7 @@ class PostSpider(scrapy.Spider):
         media_list = [m for m in media_list if type(m) != str]
         self.save_commented_posts(media_list)
         for item in media_list:
-            self.logger.debug(repr(item))
+            # self.logger.debug(repr(item))
             yield item
 
         if is_last_id_met:

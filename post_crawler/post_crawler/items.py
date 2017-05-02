@@ -20,9 +20,6 @@ class PostItem(scrapy.Item):
     name = scrapy.Field()
     username = scrapy.Field()
 
-    def __str__(self):
-        return ""
-
     @staticmethod
     def create(post):
         return PostItem(media_id=post['id'],
@@ -47,6 +44,3 @@ class UserItem(scrapy.Item):
     full_name = scrapy.Field()
     media_count = scrapy.Field()
     profile_pic_url = scrapy.Field()
-
-    def __str__(self):
-        return ""

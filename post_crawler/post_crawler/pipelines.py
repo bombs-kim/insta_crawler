@@ -13,17 +13,18 @@ from spiders import json_patch
 class LocalSavePipeline(object):
     def process_item(self, item, spider):
         if item.__class__ == PostItem:
-            item = dict(item)
-            filename = item['name']
-            del item['name']
-            line = json_patch.dump_json(item)
+            _item = dict(item)
+            filename = _item['name']
+            del _item['name']
+            line = json_patch.dump_json(_item)
             with open(spider.output_path + '/' + spider.date + '/' + filename, 'a') as f:
                 f.write(line.replace('\\/', '/') + '\n')
         elif item.__class__ == UserItem:
-            item = dict(item)
-            line = json_patch.dump_json(item)
+            _item = dict(item)
+            line = json_patch.dump_json(_item)
             with open(spider.output_path + '/''user_profile.jl', 'a') as f:
                 f.write(line + '\n')
+        spider.logger.debug(item)
 
 
 class FlumePipeline(object):

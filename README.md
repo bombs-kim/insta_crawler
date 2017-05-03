@@ -1,4 +1,4 @@
-#What is Scrapy?
+# What is Scrapy?
 
 
 It is an open source framework for extracting data you need from websites(This is called web crawling). When you do crawling, you are likely to spend more time on waiting for your requests than on actually processing the data. Let's say you have to send many requests for some websites to crawl information at the same time, you may come up with generating many threads(something like virtual CPUs). This is an bad idea becuase almost all the threads do is just waiting for responses.
@@ -25,17 +25,17 @@ Even though most code was written by me, this project has been done with another
 # How is this project composed
 
 
-This project is divided into two main crawlers. First one is user_crawler, which takes a list of commented posts as an input and then check if they are Korean and add them to the user list. The other one is post_crawler. It crawls posts of the Korean users found periodically.
+This project is divided into two main crawlers. First one is user\_crawler, which takes a list of commented posts as an input and then check if they are Korean and add them to the user list. The other one is post\_crawler. It crawls posts of the Korean users found periodically.
 
 
-## user_cralwer
+## user\_cralwer
 
-user_crawler has two spiders which are new_user_crawler and new_user_crawler_ajax. They essentialy do the same job. new_user_crawler starts with a list of commented posts, which comes from post_crawler. It checks if a user is Korean or not with somewhat naive and conservative approach. If a user's first few posts contains more than a certain number of Korean characters and proportion of Korean is large enough, he is decided to be Korean. new_user_crawler also keeps the original list of Korean users it can identify if a username is new or not. When it finishes it returns a list of Korean users newly added.
+user\_crawler has two spiders which are new\_user\_crawler and new\_user\_crawler\_ajax. They essentialy do the same job. new\_user\_crawler starts with a list of commented posts, which comes from post\_crawler. It checks if a user is Korean or not with somewhat naive and conservative approach. If a user's first few posts contains more than a certain number of Korean characters and proportion of Korean is large enough, he is decided to be Korean. new\_user\_crawler also keeps the original list of Korean users it can identify if a username is new or not. When it finishes it returns a list of Korean users newly added.
 
 
 Also, I figured out a part of the Instgram's communication mechanism between the remote server and the browser and came up with a proper AJAX requests that I can use to customize responses.
 
-`
+```
 headers = {'x-csrftoken': key, 'referer': self.baseurl % username}
 data = {
     'q': 'ig_user(%s) { media.after(9379061665064369409, 12)'
@@ -47,20 +47,20 @@ req = FormRequest(
             cookies={'csrftoken': key},
             formdata=data,
             callback=self.parse_profile_page,
-            dont_filter=True,
+            dont\_filter=True,
             meta={
                 'cookiejar': response.meta['seq'],
                 'username': username,
                 'user_id': user_id} )
 yield req
-`
+```
 This part of the code makes an valid AJAX request to the instgram server. With this spider the crawler process becomes almost 10 times faster becuase there are not much overhead in their payload.
 
 
-## post_crawler
+## post\_crawler
 
 
-It only has one spider called post_spider. It starts by making requests to Korean users you have. The actual information about post like captions, tags and image source is contained in JSON format in the response. First, you need to extract JSON part of the response using builtin scrapy's xpath support. JSON parsing was implemented in `json_helper` module, but for now JSON parsing is done by another module for some akward reasons.
+It only has one spider called post\_spider. It starts by making requests to Korean users you have. The actual information about post like captions, tags and image source is contained in JSON format in the response. First, you need to extract JSON part of the response using builtin scrapy's xpath support. JSON parsing was implemented in `json_helper` module, but for now JSON parsing is done by another module for some akward reasons.
 
 
 
@@ -68,4 +68,4 @@ It only has one spider called post_spider. It starts by making requests to Korea
 # Disclaimer
 
 
-I started this project as I started learning Python. The sytle is ugly in that camel case and snake case notations are mixed, the code is not moduled well but just put into few files, and bad names were used, for example, some log files shouldn't be called log because they are used as an valid input for another iteration. Also, it doesn't follow the scrapy's convention. Output are better be output by using builtin feed_export, not by writing to a file directly. Also, some crawlers should have been named spiders becuase crawlers and spiders indicate different things in scrapy. Not a great work indeed. But this project does its job fine indeed without causing severe errors, to my relief.
+I started this project as I started learning Python. The sytle is ugly in that camel case and snake case notations are mixed, the code is not moduled well but just put into few files, and bad names were used, for example, some log files shouldn't be called log because they are used as an valid input for another iteration. Also, it doesn't follow the scrapy's convention. Output are better be output by using builtin feed\_export, not by writing to a file directly. Also, some crawlers should have been named spiders becuase crawlers and spiders indicate different things in scrapy. Not a great work indeed. But this project does its job fine indeed without causing severe errors, to my relief.

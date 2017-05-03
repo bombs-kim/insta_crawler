@@ -9,7 +9,7 @@ This is where Scrapy comes in handy. Scrapy doesn't wait once it makes an reques
 
 
 
-# What is this project about
+# What is this project about?
 
 
 This is an web crawling project targeted to South Korean users on the Instgram. The most popular SNS among people is Facebook, but it not good for getting information about people's daily activities any more because it's now more of an alternative media for news. On the other hand, people started to use Instagram more often to share their daily lives. Instgram is a great source to get a glimpse of what's trending at a time point.
@@ -22,7 +22,7 @@ Even though most code was written by me, this project has been done with another
 
 
 
-# How is this project composed
+# How is this project composed?
 
 
 This project is divided into two main crawlers. First one is user\_crawler, which takes a list of commented posts as an input and then check if they are Korean and add them to the user list. The other one is post\_crawler. It crawls posts of the Korean users found periodically.
